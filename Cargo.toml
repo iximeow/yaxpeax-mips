@@ -1,0 +1,26 @@
+[package]
+
+name = "yaxpeax-mips"
+version = "0.0.1"
+authors = [ "iximeow <me@iximeow.net>" ]
+license = "0BSD"
+repository = ""
+description = """
+A rust mips decoder
+"""
+
+[dependencies]
+yaxpeax-arch = { path = "../../yaxpeax-arch" }
+"termion" = "1.4.0"
+"serde" = "*"
+"serde_derive" = "*"
+"num_enum" = "*"
+
+[[test]]
+name = "test"
+path = "test/test.rs"
+
+[features]
+default = []
+
+use-serde = []
