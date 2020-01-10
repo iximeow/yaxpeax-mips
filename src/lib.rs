@@ -2,6 +2,7 @@ extern crate num_enum;
 extern crate yaxpeax_arch;
 
 use std::convert::TryInto;
+use std::fmt;
 use std::mem;
 
 use num_enum::IntoPrimitive;
@@ -9,6 +10,30 @@ use num_enum::IntoPrimitive;
 use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
 
 mod display;
+
+#[derive(Debug, PartialEq)]
+pub enum DecodeError {
+    ExhaustedInput,
+    InvalidOpcode,
+    InvalidOperand,
+}
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f:  &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DecodeError::ExhaustedInput => write!(f, "exhausted input"),
+            DecodeError::InvalidOpcode => write!(f, "invalid opcode"),
+            DecodeError::InvalidOperand => write!(f, "invalid operand"),
+        }
+    }
+}
+
+impl yaxpeax_arch::DecodeError for DecodeError {
+    fn data_exhausted(&self) -> bool { self == &DecodeError::ExhaustedInput }
+    fn bad_opcode(&self) -> bool { self == &DecodeError::InvalidOpcode }
+    fn bad_operand(&self) -> bool { self == &DecodeError::InvalidOperand }
+}
+
 
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
@@ -50,6 +75,13 @@ impl Instruction {
                 Some(Operand::LongImm(self.word & 0x03_ff_ff_ff))
             },
         }
+    }
+}
+
+impl yaxpeax_arch::Instruction for Instruction {
+    fn well_defined(&self) -> bool {
+        // TODO: this is inaccurate
+        true
     }
 }
 
@@ -231,6 +263,7 @@ pub struct MIPS;
 impl Arch for MIPS {
     type Address = u32;
     type Instruction = Instruction;
+    type DecodeError = DecodeError;
     type Decoder = MipsDecoder;
     type Operand = Operand;
 }
@@ -239,18 +272,18 @@ impl Arch for MIPS {
 pub struct MipsDecoder {}
 
 impl Decoder<Instruction> for MipsDecoder {
-    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Option<Instruction> {
+    type Error = DecodeError;
+
+    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Result<Instruction, Self::Error> {
         let mut blank = Instruction::blank();
-        match self.decode_into(&mut blank, bytes) {
-            Some(_) => Some(blank),
-            None => None,
-        }
+        self.decode_into(&mut blank, bytes)
+            .map(|_: ()| blank)
     }
 
-    fn decode_into<T: IntoIterator<Item=u8>>(&self, instruction: &mut Instruction, bytes: T) -> Option<()> {
+    fn decode_into<T: IntoIterator<Item=u8>>(&self, instruction: &mut Instruction, bytes: T) -> Result<(), Self::Error> {
         let mut bytes_iter = bytes.into_iter();
         let word: Vec<u8> = bytes_iter.by_ref().take(4).collect();
-        let word = u32::from_le_bytes(word.as_slice().try_into().ok()?);
+        let word = u32::from_le_bytes(word.as_slice().try_into().map_err(|_| DecodeError::ExhaustedInput)?);
 
         instruction.word = word;
 
@@ -263,7 +296,7 @@ impl Decoder<Instruction> for MipsDecoder {
             let opc = (word & 0b111111) as u8;
 
             if [0b000101, 0b001110, 0b010101, 0b101000, 0b101001, 0b110101, 0b110111, 0b111001, 0b111101].contains(&opc) {
-                return None;
+                return Err(DecodeError::InvalidOpcode);
             }
 
             // operands in the secondary map have kind of a mess of operands. except for 0b100000
@@ -325,7 +358,7 @@ impl Decoder<Instruction> for MipsDecoder {
             // reject all 0b11xxx patterns, and the right half of table A-40, section REGIMM,
             // except two outliers.
             if opc >= 0b10_011000 || (opc & 0b00_00100 > 0 && (opc != 0b10_001100 || opc != 0b10_001110)) {
-                return None;
+                return Err(DecodeError::InvalidOpcode);
             }
             instruction.opcode = unsafe {
                 mem::transmute::<u8, Opcode>(opc)
@@ -334,7 +367,7 @@ impl Decoder<Instruction> for MipsDecoder {
         } else {
             if opc & 0b111100 == 0b011100 || opc == 0b111011 {
                 // reserved opcode
-                return None;
+                return Err(DecodeError::InvalidOpcode);
             }
             instruction.opcode = unsafe {
                 mem::transmute::<u8, Opcode>(opc)
@@ -372,7 +405,7 @@ impl Decoder<Instruction> for MipsDecoder {
                 instruction.operands = [OperandSpec::Rt, OperandSpec::BaseOffset, OperandSpec::Nothing];
             }
         }
-        return Some(());
+        return Ok(());
     }
 }
 

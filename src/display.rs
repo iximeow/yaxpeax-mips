@@ -16,7 +16,7 @@ impl fmt::Display for Instruction {
                 (Some(Operand::Reg(a)), Some(Operand::Reg(b)), Some(Operand::Imm(offs))) => {
                     if a == b {
                         if offs < 0 {
-                            return write!(f, "b $-{:#x}", -offs);
+                            return write!(f, "b $-{:#x}", offs.wrapping_neg());
                         } else {
                             return write!(f, "b $+{:#x}", offs);
                         }
@@ -44,7 +44,7 @@ impl fmt::Display for Instruction {
                 }
             } else if let Operand::Imm(imm) = op {
                 if *imm < 0 {
-                    return write!(f, "-{:#x}", -imm);
+                    return write!(f, "-{:#x}", imm.wrapping_neg());
                 } else {
                     return write!(f, "{:#x}", imm);
                 }
@@ -110,7 +110,7 @@ impl fmt::Display for Operand {
                     write!(f, "({})", name)
                 } else {
                     if *offs < 0 {
-                        write!(f, "-{:#x}({})", -offs, name)
+                        write!(f, "-{:#x}({})", offs.wrapping_neg(), name)
                     } else {
                         write!(f, "{:#x}({})", offs, name)
                     }
