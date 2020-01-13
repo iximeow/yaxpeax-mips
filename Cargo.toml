@@ -4,13 +4,11 @@ name = "yaxpeax-mips"
 version = "0.0.1"
 authors = [ "iximeow <me@iximeow.net>" ]
 license = "0BSD"
-repository = ""
-description = """
-A rust mips decoder
-"""
+repository = "http://git.iximeow.net/yaxpeax-mips/"
+description = "mips decoders for the yaxpeax project"
 
 [dependencies]
-yaxpeax-arch = { path = "../../yaxpeax-arch" }
+yaxpeax-arch = { version = "0.0.2", default-features = false, features = [] }
 "termion" = "1.4.0"
 "serde" = "*"
 "serde_derive" = "*"
