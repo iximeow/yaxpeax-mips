@@ -42,15 +42,17 @@ pub struct Instruction {
     opcode: Opcode,
 }
 
-impl Instruction {
-    fn blank() -> Self {
+impl Default for Instruction {
+    fn default() -> Self {
         Instruction {
             word: 0,
             operands: [OperandSpec::Nothing, OperandSpec::Nothing, OperandSpec::Nothing],
             opcode: Opcode::J,
         }
     }
+}
 
+impl Instruction {
     fn operand(&self, op: &OperandSpec) -> Option<Operand> {
         match op {
             OperandSpec::Nothing => None,
@@ -273,12 +275,6 @@ pub struct MipsDecoder {}
 
 impl Decoder<Instruction> for MipsDecoder {
     type Error = DecodeError;
-
-    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Result<Instruction, Self::Error> {
-        let mut blank = Instruction::blank();
-        self.decode_into(&mut blank, bytes)
-            .map(|_: ()| blank)
-    }
 
     fn decode_into<T: IntoIterator<Item=u8>>(&self, instruction: &mut Instruction, bytes: T) -> Result<(), Self::Error> {
         let mut bytes_iter = bytes.into_iter();
