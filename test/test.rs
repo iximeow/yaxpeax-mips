@@ -1,9 +1,10 @@
 extern crate yaxpeax_arch;
 extern crate yaxpeax_mips;
 
-use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
-use yaxpeax_mips::{MIPS, Instruction, Opcode};
+use yaxpeax_arch::{Arch, Decoder};
+use yaxpeax_mips::{MIPS, Instruction}; //, Opcode};
 
+#[allow(dead_code)]
 fn test_decode(data: [u8; 4], expected: Instruction) {
     let instr = <MIPS as Arch>::Decoder::default().decode(data.to_vec()).unwrap();
     assert!(
