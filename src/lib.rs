@@ -7,7 +7,7 @@ use std::mem;
 
 use num_enum::IntoPrimitive;
 
-use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
+use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction};
 
 mod display;
 
@@ -88,13 +88,13 @@ impl yaxpeax_arch::Instruction for Instruction {
 }
 
 impl LengthedInstruction for Instruction {
-    type Unit = u32;
+    type Unit = AddressDiff<u32>;
     fn min_size() -> Self::Unit {
-        4
+        AddressDiff::from_const(4)
     }
 
     fn len(&self) -> Self::Unit {
-        4
+        AddressDiff::from_const(4)
     }
 }
 
