@@ -1,39 +1,13 @@
 extern crate num_enum;
 extern crate yaxpeax_arch;
 
-use std::convert::TryInto;
-use std::fmt;
 use std::mem;
 
 use num_enum::IntoPrimitive;
 
-use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction};
+use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction, Reader, StandardDecodeError};
 
 mod display;
-
-#[derive(Debug, PartialEq)]
-pub enum DecodeError {
-    ExhaustedInput,
-    InvalidOpcode,
-    InvalidOperand,
-}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, f:  &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DecodeError::ExhaustedInput => write!(f, "exhausted input"),
-            DecodeError::InvalidOpcode => write!(f, "invalid opcode"),
-            DecodeError::InvalidOperand => write!(f, "invalid operand"),
-        }
-    }
-}
-
-impl yaxpeax_arch::DecodeError for DecodeError {
-    fn data_exhausted(&self) -> bool { self == &DecodeError::ExhaustedInput }
-    fn bad_opcode(&self) -> bool { self == &DecodeError::InvalidOpcode }
-    fn bad_operand(&self) -> bool { self == &DecodeError::InvalidOperand }
-}
-
 
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
@@ -254,18 +228,15 @@ pub enum Operand {
     JOffset(i32)
 }
 
-#[cfg(feature="use-serde")]
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MIPS;
-
-#[cfg(not(feature="use-serde"))]
+#[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct MIPS;
 
 impl Arch for MIPS {
     type Address = u32;
+    type Word = yaxpeax_arch::U32le;
     type Instruction = Instruction;
-    type DecodeError = DecodeError;
+    type DecodeError = StandardDecodeError;
     type Decoder = MipsDecoder;
     type Operand = Operand;
 }
@@ -273,13 +244,9 @@ impl Arch for MIPS {
 #[derive(Default, Debug)]
 pub struct MipsDecoder {}
 
-impl Decoder<Instruction> for MipsDecoder {
-    type Error = DecodeError;
-
-    fn decode_into<T: IntoIterator<Item=u8>>(&self, instruction: &mut Instruction, bytes: T) -> Result<(), Self::Error> {
-        let mut bytes_iter = bytes.into_iter();
-        let word: Vec<u8> = bytes_iter.by_ref().take(4).collect();
-        let word = u32::from_le_bytes(word.as_slice().try_into().map_err(|_| DecodeError::ExhaustedInput)?);
+impl Decoder<MIPS> for MipsDecoder {
+    fn decode_into<T: Reader<<MIPS as Arch>::Address, <MIPS as Arch>::Word>>(&self, instruction: &mut Instruction, words: &mut T) -> Result<(), <MIPS as Arch>::DecodeError> {
+        let word = words.next()?.0;
 
         instruction.word = word;
 
@@ -292,7 +259,7 @@ impl Decoder<Instruction> for MipsDecoder {
             let opc = (word & 0b111111) as u8;
 
             if [0b000101, 0b001110, 0b010101, 0b101000, 0b101001, 0b110101, 0b110111, 0b111001, 0b111101].contains(&opc) {
-                return Err(DecodeError::InvalidOpcode);
+                return Err(StandardDecodeError::InvalidOpcode);
             }
 
             // operands in the secondary map have kind of a mess of operands. except for 0b100000
@@ -354,7 +321,7 @@ impl Decoder<Instruction> for MipsDecoder {
             // reject all 0b11xxx patterns, and the right half of table A-40, section REGIMM,
             // except two outliers.
             if opc >= 0b10_011000 || (opc & 0b00_00100 > 0 && (opc != 0b10_001100 || opc != 0b10_001110)) {
-                return Err(DecodeError::InvalidOpcode);
+                return Err(StandardDecodeError::InvalidOpcode);
             }
             instruction.opcode = unsafe {
                 mem::transmute::<u8, Opcode>(opc)
@@ -363,7 +330,7 @@ impl Decoder<Instruction> for MipsDecoder {
         } else {
             if opc & 0b111100 == 0b011100 || opc == 0b111011 {
                 // reserved opcode
-                return Err(DecodeError::InvalidOpcode);
+                return Err(StandardDecodeError::InvalidOpcode);
             }
             instruction.opcode = unsafe {
                 mem::transmute::<u8, Opcode>(opc)

@@ -1,12 +1,13 @@
 extern crate yaxpeax_arch;
 extern crate yaxpeax_mips;
 
-use yaxpeax_arch::{Arch, Decoder};
+use yaxpeax_arch::{Arch, Decoder, U8Reader};
 use yaxpeax_mips::{MIPS, Instruction}; //, Opcode};
 
 #[allow(dead_code)]
 fn test_decode(data: [u8; 4], expected: Instruction) {
-    let instr = <MIPS as Arch>::Decoder::default().decode(data.to_vec()).unwrap();
+    let mut reader = U8Reader::new(&data[..]);
+    let instr = <MIPS as Arch>::Decoder::default().decode(&mut reader).unwrap();
     assert!(
         instr == expected,
         "decode error for {:02x}{:02x}{:02x}{:02x}:\n  decoded: {:?}\n expected: {:?}\n",
@@ -16,7 +17,8 @@ fn test_decode(data: [u8; 4], expected: Instruction) {
 }
 
 fn test_display(data: [u8; 4], expected: &'static str) {
-    let instr = <MIPS as Arch>::Decoder::default().decode(data.to_vec()).unwrap();
+    let mut reader = U8Reader::new(&data[..]);
+    let instr = <MIPS as Arch>::Decoder::default().decode(&mut reader).unwrap();
     let text = format!("{}", instr);
     assert!(
         text == expected,
